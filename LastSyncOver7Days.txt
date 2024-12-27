@@ -1,0 +1,68 @@
+﻿
+
+Set-ExecutionPolicy -ExecutionPolicy 'ByPass' -Scope 'Process' -Force -ErrorAction 'Stop' 
+
+$error.clear() ## this is the clear error history 
+
+$Path = "C:\temp\Intune_Device_Not_Synced_daysInfo"
+$PathCsv = "$Path\Intune_Device_Not_Synced_daysInfo.csv"
+$MGIModule = Get-module -Name "Microsoft.Graph.Intune" -ListAvailable
+Write-Host "Checking Microsoft.Graph.Intune is Installed or Not"
+
+    If ($MGIModule -eq $null) 
+    {
+        Write-Host "Microsoft.Graph.Intune module is not Installed"
+        Write-Host "Installing Microsoft.Graph.Intune module"
+        Install-Module -Name Microsoft.Graph.Intune -Force
+        Write-Host "Importing Microsoft.Graph.Intune module"
+        Import-Module Microsoft.Graph.Intune -Force
+    }
+
+    ELSE 
+    {   Write-Host "Microsoft.Graph.Intune is Installed"
+        Write-Host "Importing Microsoft.Graph.Intune module"
+        Import-Module Microsoft.Graph.Intune -Force
+    }
+
+
+$tenant = “d914085e-e994-4c53-b111-0f20b7f866bf”
+$authority = “https://login.windows.net/$tenant”
+$clientId = “d546c729-2aa7-4665-b246-e32af60743ea”
+$clientSecret = “IgX8Q~xXK6gj3dvKkLKXJdjUregy5z1.RoMQwbrb”
+Update-MSGraphEnvironment -AppId $clientId -Quiet
+Update-MSGraphEnvironment -AuthUrl $authority -Quiet
+Connect-MSGraph -ClientSecret $ClientSecret 
+Update-MSGraphEnvironment -SchemaVersion "Beta" -Quiet
+#$autopilotDevices = Invoke-MSGraphRequest -HttpMethod GET -Url "deviceManagement/auditEvents?`$filter=category eq '$Category' and activityDateTime gt $daysago" | Get-MSGraphAllPages
+$DeviceInfos = Invoke-MSGraphRequest -HttpMethod GET -Url "deviceManagement/managedDevices" | Get-MSGraphAllPages 
+
+# Ensure directories exist
+if (-Not (Test-Path -Path $Path)) {
+    Write-Host "Working folder $Path does not exist. Creating it now..." -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $Path -Force
+}
+
+
+
+$IntuneDeviceHardwareInfo = @()
+
+foreach($DeviceInfo in $DeviceInfos)
+{ 
+  $IntuneDeviceHSProps = [ordered] @{
+        DeviceName = $DeviceInfo.deviceName 
+        userPrincipalName = $DeviceInfo.userPrincipalName
+        lastSyncDateTime = $DeviceInfo.lastSyncDateTime
+        #wiredIPv4Addresses1= $W = $DeviceInfo.hardwareInformation.wiredIPv4Addresses
+        #WifiIpAddressV4 = $DeviceInfo.hardwareInformation.ipAddressV4
+        TodayDate =  $StartDate =(GET-DATE)
+        Daydiff =  $D = NEW-TIMESPAN –Start  $DeviceInfo.lastSyncDateTime –End  $StartDate
+        NotSync_days = $D.Days
+         }
+  $IntuneDeviceHSobject = New-Object -Type PSObject -Property $IntuneDeviceHSProps
+  $IntuneDeviceHardwareInfo +=$IntuneDeviceHSobject
+ }
+ #======================Report In CSV format==========================================================
+ 
+  $Report =  $IntuneDeviceHardwareInfo |  Where-Object {$_.NotSync_days -GT '7'} 
+  $Report | Export-Csv -Path $PathCsv  -NoTypeInformation
+  invoke-item -Path $PathCsv 
