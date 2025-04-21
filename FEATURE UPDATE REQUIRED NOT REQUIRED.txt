@@ -1,0 +1,40 @@
+SELECT distinct B.NAME0,B.User_Name0,os.Caption0 Operating_System_Name_and0,
+Chassis_Types = (CASE  WHEN VSE.ChassisTypes0 in ('8','9','10','11','12','14''21') THEN 'Laptop' 
+		               WHEN VSE.ChassisTypes0 in ('23','17','18','19','20','22') THEN 'Server'
+					   ELSE 'Desktop' END),
+os.InstallDate0 as OS_Installed_Date,
+CS.Manufacturer0,CS.Model0,CS.systemtype0,ld.freespace0 AS 'C_Drive_Free_Space', pr.Name0 AS ProcessorTypeSpeed,
+ OS_branch = (case when B.osbranch01 = 0 then 'CB'
+	 when B.osbranch01 = 1 then 'CBB'
+	 when B.osbranch01 = 2 then 'LTSB'  else '' end),
+ OS_Version = (case when b.Build01 like '%14393%' then 1607
+	 when b.Build01 like '%15065%' then 1703
+	 when b.Build01 like '%16299%' then 1709
+	 when b.Build01 like '%17134%' then 1803
+	 when b.Build01 like '%17763%' then 1809
+	 when b.Build01 like '%18363%' then 1903
+	 when b.Build01 like '%18363%' then 1909
+	 when b.Build01 like '%19041%' then 2004
+	 when b.Build01 like '%19042%' then 2009  else '' end),
+   OSLanguage0 =(case when os.OSLanguage0 = '1031' then 'de-DE German - Germany'
+	 when os.OSLanguage0  = '1033' then 'en-US English - United States'
+	 when os.OSLanguage0  = '1041' then 'ja-JP Japanese - Japan'
+	 when os.OSLanguage0  = '1042' then 'ko-KR Korean - Korea'
+	 when os.OSLanguage0  = '2052' then 'zh-CN Chinese (Simplified) - China'
+	 when os.OSLanguage0  = '2057' then 'en-GB English - United Kingdom'  else '' end),
+UI.Title AS Required_feature_edition,
+IsRequired=(case when css.Status=2 then 'Required' 
+			WHEN CSS.Status =3 then 'Installed'  else '' end)
+FROM  v_UpdateComplianceStatus css
+join v_UpdateInfo ui on ui.CI_ID=css.CI_ID
+inner join v_R_System B on css.ResourceID=B.ResourceID 
+Join v_GS_OPERATING_SYSTEM os on css.ResourceID=os.ResourceID 
+join V_GS_System_enclosure VSE on VSE.ResourceID=B.ResourceID 
+inner join v_GS_COMPUTER_SYSTEM CS on CS.ResourceID= B.ResourceID
+INNER JOIN v_GS_LOGICAL_DISK AS ld ON B.ResourceID = ld.ResourceID
+INNER JOIN v_GS_PROCESSOR pr ON B.ResourceID = pr.ResourceID
+WHERE ld.DriveType0=3 AND ld.deviceid0='C:' 
+	AND UI.Title LIKE '%Feature update to Windows 10%1909%x64%' 
+	--and b.Build01 like '%17763%' 
+
+
