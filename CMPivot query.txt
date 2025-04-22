@@ -1,0 +1,5 @@
+Registry('hklm:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\CompatMarkers\GE24H2') | where Property == 'GatedBlockId'
+
+Registry('hklm:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\CompatMarkers\GE24H2') | where Property == 'GatedBlockReason'
+
+Registry('hklm:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\CompatMarkers\GE24H2') | where Property == 'GatedFeature'
