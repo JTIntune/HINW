@@ -1,0 +1,28 @@
+declare @RscID int; 
+select @RscID=ResourceID from v_R_System where ((Name0 = 'LP-E4115B32310E') and (Active0 = 1));
+
+select 
+                                                catinfo.CategoryInstanceName as Vendor,
+                                                catinfo2.CategoryInstanceName as UpdateClassification,
+            ui.BulletinID as BulletinID,
+            ui.ArticleID as ArticleID,
+            ui.Title as Title,            
+            Targeted=(case when ctm.ResourceID is not null then 'T' else '' end),
+            Installed=(case when css.Status=3 then 'I' else '' end),
+            IsRequired=(case when css.Status=2 then 'R' else '' end),
+            Deadline=cdl.Deadline,
+            ui.CI_UniqueID as UniqueUpdateID,
+                                                ui.InfoURL as InformationURL
+from v_UpdateComplianceStatus css
+join v_UpdateInfo ui on ui.CI_ID=css.CI_ID
+join v_CICategories_All catall on catall.CI_ID=ui.CI_ID 
+join v_CategoryInfo catinfo on catall.CategoryInstance_UniqueID = catinfo.CategoryInstance_UniqueID and catinfo.CategoryTypeName='Company' 
+join v_CICategories_All catall2 on catall2.CI_ID=ui.CI_ID 
+join v_CategoryInfo catinfo2 on catall2.CategoryInstance_UniqueID = catinfo2.CategoryInstance_UniqueID and catinfo2.CategoryTypeName='UpdateClassification' 
+left join v_CITargetedMachines ctm on ctm.CI_ID=css.CI_ID and ctm.ResourceID = @RscID
+left join (select atc.CI_ID, Deadline=min(a.EnforcementDeadline) 
+from v_CIAssignment a join v_CIAssignmentToCI atc on atc.AssignmentID=a.AssignmentID
+group by atc.CI_ID) cdl   on cdl.CI_ID=css.CI_ID
+where  css.ResourceID = @RscID 
+and ((css.Status=2) or (css.Status=3))
+order by cdl.Deadline desc
