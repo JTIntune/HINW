@@ -1,0 +1,60 @@
+
+#==================User Input===============
+
+
+# Replace with a list of device names
+$targetDeviceNames = @(
+
+    'DESKTOP-LFN855L',
+    'DESKTOP-5MBQSM2',
+    'DESKTOP-7N9P1LK'
+)
+
+
+#==================================================
+# Check if the Microsoft.Graph module is installed
+if (-not (Get-Module -Name Microsoft.Graph -ListAvailable)) {
+    Write-Host "Microsoft.Graph module not found. Installing..."
+    # Module is not installed, so install it
+    Install-Module Microsoft.Graph -Scope CurrentUser -Force -AllowClobber
+    #Install-Module Microsoft.Graph -Scope AllUsers -Force -AllowClobber
+    Write-Host "Microsoft.Graph module installed successfully." -ForegroundColor Green
+} else {
+    Write-Host "Microsoft.Graph module is already installed." -ForegroundColor Green
+}
+Write-Host "Importing Microsoft.Graph module..." -ForegroundColor Yellow
+# Import the Microsoft.Graph module
+
+Import-Module Microsoft.Graph.Authentication
+Write-Host "Microsoft.Graph.Authentication module imported successfully."-ForegroundColor Green
+
+Connect-MgGraph -Scopes "DeviceManagementApps.Read.All, DeviceManagementConfiguration.Read.All, DeviceManagementManagedDevices.Read.All" -NoWelcome
+
+$result = @()
+
+
+# Get all detected apps (no pagination cutoff)
+$detectedApps = Get-MgDeviceManagementDetectedApp -All
+
+foreach ($app in $detectedApps) {
+    $managedDevices = Get-MgDeviceManagementDetectedAppManagedDevice -DetectedAppId $app.Id
+
+    foreach ($device in $managedDevices) {
+        if ($targetDeviceNames -contains $device.DeviceName) {
+            $result += [pscustomobject]@{
+                Device   = $device.DeviceName
+                App      = $app.DisplayName
+                Version  = $app.Version
+                Platform = $app.Platform
+            }
+        }
+    }
+}
+
+# Sort and export to CSV
+$sortedResult = $result | Sort-Object -Property Device, App, Version
+$csvPath = "C:\Temp\DetectedAppsReport.csv"
+
+$sortedResult | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+
+Write-Host "Report saved to: $csvPath"
