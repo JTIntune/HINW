@@ -1,0 +1,83 @@
+##PS Script-  Content Removal for multiple Apps from SCCM Console
+ 
+$apps = @("MyApplication1-1.0",
+"MyApplication2-1.0",
+"MyApplication3-1.0",
+"MyApplication4-1.0")
+$DPList = Get-CMDistributionPointInfo | Select-Object ServerName | Sort-Object
+ 
+foreach ($app in $apps)
+{
+foreach ($dp in $DPList)
+{
+Write-Host -ForegroundColor Green "Removing DP $dp.ServerName from application $app."
+Remove-CMContentDistribution -ApplicationName $app -DistributionPointName $dp.ServerName -Force -Verbose -DisableContentDependencyDetection
+}
+ 
+}
+--------------------------
+Redistribute Failed Contents to DPs
+ 
+Function Redistribute-Content {
+    [CMDletBinding()]
+    param (
+    [Parameter(Mandatory=$True)]
+    [ValidateNotNullorEmpty()]
+    [String]$DistributionPoint,
+    [Parameter(Mandatory=$True)]
+    [ValidateNotNullorEmpty()]
+    [String]$SiteCode
+    )
+    Process {
+    $query = 'SELECT * FROM SMS_PackageStatusDistPointsSummarizer WHERE State = 2 OR State = 3'
+    $Packages = Get-WmiObject -Namespace "root\SMS\Site_$($SiteCode)" -Query $query | Select-Object PackageID, @{N='DistributionPoint';E={$_.ServerNalPath.split('\')[2]}}
+    $FailedPackages = $Packages | Where-Object {$_.DistributionPoint -like "$DistributionPoint"} | Select-Object -ExpandProperty PackageID
+    foreach ($PackageID in $FailedPackages) {
+        $List = Get-WmiObject -Namespace "root\SMS\Site_$($SiteCode)" -Query "Select * From SMS_DistributionPoint WHERE PackageID='$PackageID' AND ServerNALPath like '%$DistributionPoint%'"
+        $List.RefreshNow = $True
+        $List.Put()
+        }
+    }
+}
+---------------------
+##PowerShell script to delete SCCM deployment packages and SUG
+#By Package ID
+Remove-CMSoftwareUpdateDeploymentPackage -PackageID "10000100" -Force
+#By Package Name
+Remove-CMSoftwareUpdateGroup -Name "My-MSOff2016-201903" -Force
+-------------------
+##Distributing contents to DP Group
+Start-CMContentDistribution -ApplicationName "Micro_Focus_StarTeam_en-US_" -DistributionPointGroupName "US-All-DistributionPoints-Pilot-Group"
+Start-CMContentDistribution -DriverPackageName "DRV_LEN_W10_" -DistributionPointGroupName "US-PL-FPS-Refresh"
+Start-CMContentDistribution -PackageName "IntelAMT" -DistributionPointGroupName "US-My-FPS-Refresh"
+Start-CMContentDistribution -BootImageName "Boot Image x64 - Current" -DistributionPointGroupName "US-PL-FPS-Refresh"
+Start-CMContentDistribution -OperatingSystemImageName "Windows 10 22h2" -DistributionPointGroupName "US-PL-FPS-Refresh"
+--------------------
+##Removing contents from all package types
+ 
+#For Application
+Remove-CMContentDistribution -ApplicationName "SAP_GUI_en" -DistributionPointName 'dpServername.domain.com' -Force
+ 
+#For DeploymentPKG
+Remove-CMContentDistribution -DeploymentPackageName "LA-MSSec202003-W7-ESU-Prereq" -DistributionPointName 'dpServername.domain.com' -Force
+Remove-CMContentDistribution -DeploymentPackageName "MSSec202003-W10" -DistributionPointName 'dpServername.domain.com' -Force
+#For DriverPKG
+Remove-CMContentDistribution -DriverPackageName "Drivers_Win10_Lenovo_X13" -DistributionPointName 'dpServername.domain.com' -Force
+ 
+#for PKG
+Remove-CMContentDistribution -PackageName "Drivers_Win10_Lenovo_t14" -DistributionPointName 'dpServername.domain.com' -Force
+ 
+#for Image
+Remove-CMContentDistribution -OperatingSystemImageName "Windows 10 20H2" -DistributionPointName 'dpServername.domain.com' -Force
+-----------------------
+##Delete Software update package
+Remove-CMSoftwareUpdateDeploymentPackage -PackageID "102005F9" -Force
+Remove-CMSoftwareUpdateDeploymentPackage -PackageID "10200205" -Force
+ 
+##Delete SUG
+Remove-CMSoftwareUpdateGroup -Name "MSEdge-Update" -Force
+--------------------------------
+##--PS command to update package source path 
+$pkg = Get-CMPackage -Id "1010020A"
+Set-CMPackage -InputObject $pkg -Path "\\serversharepath\d$\Content\SCApps\Tanium_Client-v1"
+-------------------------------
